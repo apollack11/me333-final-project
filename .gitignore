@@ -1,3 +1,8 @@
 /videos
 .MOV
 .~
+.o
+.dis
+.elf
+.map
+.hex
