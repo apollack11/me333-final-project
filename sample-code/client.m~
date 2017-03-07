@@ -61,8 +61,10 @@ while ~has_quit
         case 'q'
             has_quit = true;             % exit client
         case 'r'
-            state = fscanf(mySerial,'%s');
-            fprintf('The PIC32 controller mode is currently %s\n',state);
+            state = input('Enter desired state: ');
+            fprintf(mySerial,'%d\n',state);
+            state = fscanf(mySerial,'%d');
+            fprintf
         otherwise
             fprintf('Invalid Selection %c\n', selection);
     end

@@ -1,4 +1,4 @@
-#include "encoder.h"                   
+#include "encoder.h"
 #include <xc.h>
 
 static int encoder_command(int read) { // send a command to the encoder chip
@@ -17,6 +17,18 @@ int encoder_ticks(void) {
   return encoder_command(1);
 }
 
+int encoder_angle(void) {
+  encoder_command(1); // call it twice!
+  float encoder_degrees = 0;
+  encoder_degrees = 360 * ((encoder_command(1) - 32768) / 1792.0);
+  return encoder_degrees;
+}
+
+void encoder_reset(void) {
+  encoder_command(0); // call it twice!
+  encoder_command(0);
+}
+
 void encoder_init(void) {
   // SPI initialization for reading from the decoder chip
   SPI4CON = 0;              // stop and reset SPI4
@@ -26,7 +38,7 @@ void encoder_init(void) {
   SPI4CONbits.MSTEN = 1;    // master mode
   SPI4CONbits.MSSEN = 1;    // slave select enable
   SPI4CONbits.MODE16 = 1;   // 16 bit mode
-  SPI4CONbits.MODE32 = 0; 
+  SPI4CONbits.MODE32 = 0;
   SPI4CONbits.SMP = 1;      // sample at the end of the clock
   SPI4CONbits.ON = 1;       // turn SPI on
 }

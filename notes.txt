@@ -1,0 +1,45 @@
+ME333 Project Notes
+
+Demo due 3/7/17: need to do the menu for parts b, c, d, e, and f
+
+Commands:
+
+a: Read current sensor (ADC counts). Print the motor current as measured using the current sensor, in ADC counts (0-1023). For example, the result could look like
+  ENTER COMMAND: a
+  The motor current is 903 ADC counts.
+
+b: Read current sensor (mA). Print the motor current as measured using the current sensor, in mA. The output should look like
+  The motor current is 763 mA.
+
+c: Read encoder (counts). Print the encoder angle, in encoder counts. By convention, the encoder count increases as the motor rotates counterclockwise. An example output:
+  The motor angle is 314 counts.
+
+
+ADC Section
+
+Choose R3 to be ~330 ohms
+Motor Resistance: 11.5 ohms
+I_max = 2*V / R_motor = 2 * 6 / 11.5 = 1.043 ohms
+V_max = I_max * R_sense = 1.043 * 0.015 = 0.0156 V
+1.65 V = G * V_max --> G = 104.77
+R2 = 10 Mohms, R1 = 100,000 ohms
+f_c = 1 / (2 * pi * RC) = 200 Hz --> RC = 0.000796
+R = 100 + 680 ohms, C = 1 micro Farad
+
+RS+:
+10 ohms, 600 mA, 520 mA, 2.35 V, 750
+20 ohms, 300 mA, 290 mA, 2.0 V, 623
+40 ohms, 150 mA, 150 mA, 1.78 V, 551
+
+Open: 1.55 V, 478 ADC Counts
+
+RS-:
+40 ohms, 150 mA, 150 mA, 1.3 V, 401
+20 ohms, 300 mA, 280 mA, 1.1 V, 330
+10 ohms, 600 mA, 520 mA, 0.7 V, 204
+
+Current = 1.9186 * (ADC Count) - 913.18
+
+
+V = 1.65 + I * 0.015 ohms * G
+I = (V - 1.65) / (0.015 * (1 + 100))
