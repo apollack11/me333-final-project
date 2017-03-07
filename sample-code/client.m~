@@ -58,13 +58,18 @@ while ~has_quit
         case 'e'
             degrees = fscanf(mySerial,'%f');
             fprintf('The encoder has been reset to %0.2f degrees.\n', degrees);
+        case 'f'                         % example operation
+            speed = input('Set PWM (-100 to 100) '); % get the speed to send
+            fprintf(mySerial, '%d\n',speed); % send the speed
+            speed = fscanf(mySerial,'%d');
+            fprintf('The  %0.2f degrees.\n',degrees);
+        case 'p'
+            fprintf('Unpowering the motor\n');
         case 'q'
             has_quit = true;             % exit client
         case 'r'
-            state = input('Enter desired state: ');
-            fprintf(mySerial,'%d\n',state);
-            state = fscanf(mySerial,'%d');
-            fprintf
+            state = fscanf(mySerial,'%s');
+            fprintf('The PIC32 controller mode is currently %s\n',state);
         otherwise
             fprintf('Invalid Selection %c\n', selection);
     end

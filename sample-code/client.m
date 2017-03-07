@@ -34,7 +34,7 @@ has_quit = false;
 while ~has_quit
     fprintf('PIC32 MOTOR DRIVER INTERFACE\n\n');
     % display the menu options; this list will grow
-    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       q: Quit\n');
+    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       f: Set PWM (-100 to 100)\n    p: Unpower the Motor                   q: Quit\n    r: Get mode\n');
     % read the user's choice
     selection = input('\nENTER COMMAND: ', 's');
      
@@ -51,13 +51,20 @@ while ~has_quit
             fprintf('Read current sensor %0.2f (mA)\n',ADC_current);
         case 'c'
             counts = fscanf(mySerial,'%d');
-            fprintf('The motor angle is %d counts.\n',counts);
+            fprintf('The motor angle is %d counts\n',counts);
         case 'd'
             degrees = fscanf(mySerial,'%f');
-            fprintf('The motor angle is %0.2f degrees.\n',degrees);
+            fprintf('The motor angle is %0.2f degrees\n',degrees);
         case 'e'
             degrees = fscanf(mySerial,'%f');
-            fprintf('The encoder has been reset to %0.2f degrees.\n', degrees);
+            fprintf('The encoder has been reset to %0.2f degrees\n', degrees);
+        case 'f'                         % example operation
+            speed = input('Set PWM (-100 to 100) '); % get the speed to send
+            fprintf(mySerial, '%d\n',speed); % send the speed
+            speed = fscanf(mySerial,'%d');
+            fprintf('The speed was set to %0.2d\n',speed);
+        case 'p'
+            fprintf('Unpowering the motor\n');
         case 'q'
             has_quit = true;             % exit client
         case 'r'
