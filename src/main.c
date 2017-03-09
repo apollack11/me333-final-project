@@ -12,8 +12,9 @@
 static volatile int Speed;
 static volatile float Desired_angle;
 static volatile float Kp_current = 20, Ki_current = 1; // set current control gains to 0
+//static volatile float Kp_current = 0.27, Ki_current = 0.033; // set current control gains to 0
 // static volatile float Kp_position = 150, Ki_position = 0, Kd_position = 5000; // set position control gains to 0
-static volatile float Kp_position = 1, Ki_position = 0, Kd_position = 0; // set position control gains to 0
+static volatile float Kp_position = 150, Ki_position = 0, Kd_position = 5000; // set position control gains to 0
 static volatile float Desired_current = 0;
 static volatile int Eint_current = 0;
 static volatile int Eint_position = 0;
@@ -29,9 +30,8 @@ static volatile float U_check;
 
 void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECTOR = 8
     static int current_count = 0;
-    static int actual_current = 0;
-    static float actual_current2 = 0;
-    static int reference_current = 200;
+    static float actual_current = 0;
+    static float reference_current = 200;
 
     switch (get_mode()) {
       case IDLE: {
@@ -56,10 +56,10 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
         }
         if (current_count < 100) {
           // measure the current value
-          actual_current = (int)ADC_milliAmps();
+          actual_current = ADC_milliAmps();
           // store the value of reference and actual current in the reference current array
-          Reference_current_array[current_count] = reference_current;
-          Actual_current_array[current_count] = actual_current;
+          Reference_current_array[current_count] = (int)reference_current;
+          Actual_current_array[current_count] = (int)actual_current;
 
           // PI Controller
           float error = reference_current - actual_current;
@@ -95,11 +95,11 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
       }
       case HOLD: {
         // measure the current value
-        actual_current2 = ADC_milliAmps();
+        actual_current = ADC_milliAmps();
         reference_current = Desired_current;
 
         // PI Controller
-        float error = reference_current - actual_current2;
+        float error = reference_current - actual_current;
         Eint_current = Eint_current + error;
         float u = Kp_current * error + Ki_current * Eint_current;
 
@@ -118,8 +118,6 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
           LATDbits.LATD5 = 0;
           OC1RS = (unsigned int) ((unew / 100.0) * PR3);
         }
-
-        Error_prev = error;
 
         break;
       }

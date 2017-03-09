@@ -77,7 +77,7 @@ while ~has_quit
             Ki = input('Set your desired Ki position gain [recommended: 0.32]: ');
             fprintf(mySerial, '%f\n',Ki);
             Kd = input('Set your desired Kd position gain [recommended: 10.63]: ');
-            fprintf(mySerial, '%f\n',Ki);
+            fprintf(mySerial, '%f\n',Kd);
             fprintf('Sending Kp = %0.2f, Ki = %0.2f, and Kd = %0.2f to the position controller\n', Kp, Ki, Kd);
         case 'j'
             Kp = fscanf(mySerial, '%f');
