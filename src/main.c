@@ -15,16 +15,27 @@
 #define ITEST_SIZE 100
 
 static volatile int Speed;
+static volatile float Desired_angle;
 static volatile float Kp_current = 20, Ki_current = 1; // set current control gains to 0
-// static volatile float Kp_position = 4.76, Ki_position = 0.32, Kd_position = 10.63; // set position control gains to 0
-static volatile int Eint = 0;
+// static volatile float Kp_position = 150, Ki_position = 0, Kd_position = 5000; // set position control gains to 0
+static volatile float Kp_position = 1, Ki_position = 0, Kd_position = 0; // set position control gains to 0
+static volatile float Desired_current = 0;
+static volatile int Eint_current = 0;
+static volatile int Eint_position = 0;
+static volatile float Error_prev = 0;
 static volatile int Reference_current_array[ITEST_SIZE];
 static volatile int Actual_current_array[ITEST_SIZE];
 static volatile int StoringData = 0;    // if this flag = 1, currently storing plot data
 
-void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
+static volatile int Eint_check;
+static volatile float Error_prev_check;
+static volatile float Error_check;
+static volatile float U_check;
+
+void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECTOR = 8
     static int current_count = 0;
     static int actual_current = 0;
+    static float actual_current2 = 0;
     static int reference_current = 200;
 
     switch (current_mode) {
@@ -44,9 +55,9 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
         break;
       }
       case ITEST: {
-        if (current_count == 0) {
-          Eint = 0;
-        }
+        // if (current_count == 0) {
+        //   Eint_current = 0;
+        // }
 
         // current counter changes sign of reference current every 25 iterations
         if (current_count != 0 && current_count % 25 == 0) { // check how many iterations through the ISR
@@ -61,8 +72,8 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
 
           // PI Controller
           float error = reference_current - actual_current;
-          Eint = Eint + error;
-          float u = Kp_current * error + Ki_current * Eint;
+          Eint_current = Eint_current + error;
+          float u = Kp_current * error + Ki_current * Eint_current;
 
           float unew = ((u / 1000) / 3.3) * 100;
           if (unew > 100.0) {
@@ -93,13 +104,13 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
       }
       case HOLD: {
         // measure the current value
-        actual_current = (int)ADC_milliAmps();
-        reference_current = get_reference_current();
+        actual_current2 = ADC_milliAmps();
+        reference_current = Desired_current;
 
         // PI Controller
-        float error = reference_current - actual_current;
-        Eint = Eint + error;
-        float u = Kp_current * error + Ki_current * Eint;
+        float error = reference_current - actual_current2;
+        Eint_current = Eint_current + error;
+        float u = Kp_current * error + Ki_current * Eint_current;
 
         float unew = ((u / 1000) / 3.3) * 100;
         if (unew > 100.0) {
@@ -117,6 +128,8 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
           OC1RS = (unsigned int) ((unew / 100.0) * PR3);
         }
 
+        Error_prev = error;
+
         break;
       }
       // case TRACK: {
@@ -125,6 +138,68 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
       // }
     }
     IFS0bits.T2IF = 0;
+}
+
+// void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
+void __ISR(16, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
+    static float actual_position = 0;
+    static int flag = 0;
+
+    switch (current_mode) {
+      case IDLE: {
+
+        break;
+      }
+      case PWM: {
+
+        break;
+      }
+      case ITEST: {
+
+        break;
+      }
+      case HOLD: {
+        LATDbits.LATD6 = !LATDbits.LATD6;
+        // measure the angle value (deg)
+        actual_position = encoder_angle();
+
+        if (Eint_position > 1000) {
+          Eint_position = 1000;
+        }
+
+        // PI Controller
+        float error = Desired_angle - actual_position;
+        float edot = error - Error_prev;
+        Eint_position = Eint_position + error;
+        float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
+
+        // if (flag == 0) {
+          Eint_check = Eint_position;
+          Error_prev_check = Error_prev;
+          Error_check = Desired_angle - actual_position;
+          U_check = -(Kp_position * (Desired_angle - actual_position));
+          // flag = 1;
+        // }
+
+        // not sure what to put here
+        if (u > 300) {
+          Desired_current = 300;
+        } else if (u < -300) {
+          Desired_current = -300;
+        } else {
+          Desired_current = u;
+        }
+
+        Error_prev = error;
+        break;
+      }
+      // case TRACK: {
+      //
+      //   break;
+      // }
+    }
+    // LATDbits.LATD6 = !LATDbits.LATD6; // checking frequency of ISR
+    IFS0bits.T4IF = 0;
 }
 
 int main()
@@ -141,6 +216,8 @@ int main()
   Current_control_init();
   Position_control_init();
   __builtin_enable_interrupts();
+
+  encoder_reset(); // might need this? encoder reading high value at startup
 
   current_mode = IDLE;
 
@@ -222,26 +299,25 @@ int main()
         NU32_ReadUART3(buffer,BUF_SIZE);
         sscanf(buffer, "%f", &kdtemp);
         __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
-        set_position_control_gains(kptemp, kitemp, kdtemp); // copy local variables to ones used by ISR
+        Kp_position = kptemp;
+        Ki_position = kitemp;
+        Kd_position = kdtemp;
         __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
         break;
       }
       case 'j':                      // get position gains
       {
-        kptemp = get_position_control_Kp();
-        kitemp = get_position_control_Ki();
-        kdtemp = get_position_control_Kd();
-        sprintf(buffer,"%f\r\n", kptemp); // return Kp_position
+        sprintf(buffer,"%f\r\n", Kp_position); // return Kp_position
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", kitemp); // return Ki_position
+        sprintf(buffer,"%f\r\n", Ki_position); // return Ki_position
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", kdtemp); // return Kd_position
+        sprintf(buffer,"%f\r\n", Kd_position); // return Kd_position
         NU32_WriteUART3(buffer);
         break;
       }
       case 'k':                      // current test mode
       {
-        Eint = 0;
+        Eint_current = 0;
         StoringData = 1;
         current_mode = ITEST;
         while (StoringData) {
@@ -260,14 +336,16 @@ int main()
       }
       case 'l':                      // go to motor angle
       {
-        __builtin_disable_interrupts();
-        Eint = 0;
-        clear_error_variables();
+        Eint_current = 0;
+        Eint_position = 0;
+        Error_prev = 0;
+        Desired_current = 0;
         NU32_ReadUART3(buffer,BUF_SIZE);
         sscanf(buffer, "%f", &angle);
-        set_desired_angle(angle);
+        __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
+        Desired_angle = angle;
+        __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
         current_mode = HOLD;
-        __builtin_enable_interrupts();
         break;
       }
       case 'p':
@@ -290,7 +368,19 @@ int main()
       }
       case 'z':
       {
-        sprintf(buffer,"%d\r\n", get_reference_current());
+        sprintf(buffer,"%f\r\n", Desired_current);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%d\r\n", Eint_check);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%d\r\n", Eint_position);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", Error_prev_check);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", Error_check);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", U_check);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", Desired_angle);
         NU32_WriteUART3(buffer);
         break;
       }
