@@ -1,7 +1,13 @@
 #include "utilities.h"
 
-char * get_current_mode(void) {
-  switch(current_mode) {
+static volatile Mode mode = IDLE;
+
+int get_mode(void) {
+  return mode;
+}
+
+char * get_string_mode(void) {
+  switch(mode) {
     case IDLE: {
       return "IDLE";
       break;
@@ -22,6 +28,11 @@ char * get_current_mode(void) {
       return "TRACK";
       break;
     }
-
   }
+}
+
+void set_mode(Mode m) {
+  __builtin_disable_interrupts();
+  mode = m;
+  __builtin_enable_interrupts();
 }

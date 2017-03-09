@@ -7,11 +7,6 @@
 #include <stdio.h>
 
 #define BUF_SIZE 200
-#define NUMSAMPS 1000      // number of points in the waveform
-#define PLOTPTS 200        // number of data points to plot
-#define DECIMATION 10      // plot every 10th point
-#define SAMPLE_TIME 10     // 10 core timer ticks = 250ns
-
 #define ITEST_SIZE 100
 
 static volatile int Speed;
@@ -38,7 +33,7 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
     static float actual_current2 = 0;
     static int reference_current = 200;
 
-    switch (current_mode) {
+    switch (get_mode()) {
       case IDLE: {
         LATDbits.LATD5 = 0;
         OC1RS = 0;
@@ -55,10 +50,6 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
         break;
       }
       case ITEST: {
-        // if (current_count == 0) {
-        //   Eint_current = 0;
-        // }
-
         // current counter changes sign of reference current every 25 iterations
         if (current_count != 0 && current_count % 25 == 0) { // check how many iterations through the ISR
           reference_current *= -1; // set reference current to opposite sign
@@ -97,7 +88,7 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
           StoringData = 0;
           current_count = 0;
           reference_current = 200;
-          current_mode = IDLE;
+          set_mode(IDLE);
         }
 
         break;
@@ -140,12 +131,10 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
     IFS0bits.T2IF = 0;
 }
 
-// void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
-void __ISR(16, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
+void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) {
     static float actual_position = 0;
-    static int flag = 0;
 
-    switch (current_mode) {
+    switch (get_mode()) {
       case IDLE: {
 
         break;
@@ -159,13 +148,8 @@ void __ISR(16, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
         break;
       }
       case HOLD: {
-        LATDbits.LATD6 = !LATDbits.LATD6;
         // measure the angle value (deg)
         actual_position = encoder_angle();
-
-        if (Eint_position > 1000) {
-          Eint_position = 1000;
-        }
 
         // PI Controller
         float error = Desired_angle - actual_position;
@@ -173,13 +157,13 @@ void __ISR(16, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
         Eint_position = Eint_position + error;
         float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
 
-        // if (flag == 0) {
-          Eint_check = Eint_position;
-          Error_prev_check = Error_prev;
-          Error_check = Desired_angle - actual_position;
-          U_check = -(Kp_position * (Desired_angle - actual_position));
-          // flag = 1;
-        // }
+        // // if (flag == 0) {
+        //   Eint_check = Eint_position;
+        //   Error_prev_check = Error_prev;
+        //   Error_check = Desired_angle - actual_position;
+        //   U_check = -(Kp_position * (Desired_angle - actual_position));
+        //   // flag = 1;
+        // // }
 
         // not sure what to put here
         if (u > 300) {
@@ -198,7 +182,6 @@ void __ISR(16, IPL5SOFT) PositionController(void) { // _TIMER_4_VECTOR = 8
       //   break;
       // }
     }
-    // LATDbits.LATD6 = !LATDbits.LATD6; // checking frequency of ISR
     IFS0bits.T4IF = 0;
 }
 
@@ -219,7 +202,7 @@ int main()
 
   encoder_reset(); // might need this? encoder reading high value at startup
 
-  current_mode = IDLE;
+  set_mode(IDLE);
 
   float kptemp = 0, kitemp = 0, kdtemp = 0;
   float angle = 0;
@@ -262,7 +245,7 @@ int main()
       }
       case 'f':                      // send PWM value to motor
       {
-        current_mode = PWM;
+        set_mode(PWM);
         NU32_ReadUART3(buffer,BUF_SIZE);
         sscanf(buffer, "%d", &Speed);
         break;
@@ -276,14 +259,11 @@ int main()
         __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
         Kp_current = kptemp;
         Ki_current = kitemp;
-        // set_current_control_gains(kptemp, kitemp); // copy local variables to ones used by ISR
         __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
         break;
       }
       case 'h':                      // get current gains
       {
-        // kptemp = get_current_control_Kp();
-        // kitemp = get_current_control_Ki();
         sprintf(buffer,"%f\r\n", Kp_current); // return Kp_current
         NU32_WriteUART3(buffer);
         sprintf(buffer,"%f\r\n", Ki_current); // return Ki_current
@@ -319,7 +299,7 @@ int main()
       {
         Eint_current = 0;
         StoringData = 1;
-        current_mode = ITEST;
+        set_mode(ITEST);
         while (StoringData) {
           ;
         }
@@ -345,24 +325,24 @@ int main()
         __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
         Desired_angle = angle;
         __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
-        current_mode = HOLD;
+        set_mode(HOLD);
         break;
       }
       case 'p':
       {
-        current_mode = IDLE;
+        set_mode(IDLE);
         Speed = 0;
         break;
       }
       case 'q':
       {
         // handle q for quit. Later you may want to return to IDLE mode here.
-        current_mode = IDLE;
+        set_mode(IDLE);
         break;
       }
       case 'r':
       {
-        sprintf(buffer,"%s\r\n", get_current_mode());
+        sprintf(buffer,"%s\r\n", get_string_mode());
         NU32_WriteUART3(buffer);
         break;
       }
