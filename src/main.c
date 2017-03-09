@@ -14,19 +14,11 @@
 #define ITEST_SIZE 100
 
 static volatile int Speed;
-static volatile float Kp_current = 40, Ki_current = 0.32; // set current control gains to 0
+static volatile float Kp_current = 20, Ki_current = 1; // set current control gains to 0
 static volatile int Eint = 0;
 static volatile int Reference_current_array[ITEST_SIZE];
 static volatile int Actual_current_array[ITEST_SIZE];
 static volatile int StoringData = 0;    // if this flag = 1, currently storing plot data
-
-static volatile float U_check;
-static volatile int Eint_check;
-static volatile int Eint_check2;
-static volatile float Error_check;
-static volatile int Ref_check;
-static volatile int Actual_check;
-static volatile float Unew_check;
 
 void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) { // _TIMER_2_VECTOR = 8
     static int current_count = 0;
@@ -221,20 +213,8 @@ int main()
       }
       case 'z':
       {
-        sprintf(buffer,"%f\r\n", U_check);
-        NU32_WriteUART3(buffer);
         // sprintf(buffer,"%d\r\n", Eint_check2);
         // NU32_WriteUART3(buffer);
-        sprintf(buffer,"%d\r\n", Eint_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", Error_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%d\r\n", Ref_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%d\r\n", Actual_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", Unew_check);
-        NU32_WriteUART3(buffer);
         break;
       }
       default:
