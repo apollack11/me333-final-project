@@ -3,6 +3,7 @@
 #include "isense.h"
 #include "utilities.h"
 #include "currentcontrol.h"
+#include "positioncontrol.h"
 #include <stdio.h>
 
 #define BUF_SIZE 200
@@ -15,12 +16,13 @@
 
 static volatile int Speed;
 static volatile float Kp_current = 20, Ki_current = 1; // set current control gains to 0
+// static volatile float Kp_position = 4.76, Ki_position = 0.32, Kd_position = 10.63; // set position control gains to 0
 static volatile int Eint = 0;
 static volatile int Reference_current_array[ITEST_SIZE];
 static volatile int Actual_current_array[ITEST_SIZE];
 static volatile int StoringData = 0;    // if this flag = 1, currently storing plot data
 
-void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) { // _TIMER_2_VECTOR = 8
+void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller2(void) { // _TIMER_2_VECTOR = 8
     static int current_count = 0;
     static int actual_current = 0;
     static int reference_current = 200;
@@ -89,6 +91,38 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) Controller(void) { // _TIMER_2_VECTOR = 8
 
         break;
       }
+      case HOLD: {
+        // measure the current value
+        actual_current = (int)ADC_milliAmps();
+        reference_current = get_reference_current();
+
+        // PI Controller
+        float error = reference_current - actual_current;
+        Eint = Eint + error;
+        float u = Kp_current * error + Ki_current * Eint;
+
+        float unew = ((u / 1000) / 3.3) * 100;
+        if (unew > 100.0) {
+          unew = 100.0;
+        } else if (unew < -100.0) {
+          unew = -100.0;
+        }
+
+        // set new PWM value
+        if (unew < 0) {
+          LATDbits.LATD5 = 1;
+          OC1RS = (unsigned int) ((-unew / 100.0) * PR3);
+        } else {
+          LATDbits.LATD5 = 0;
+          OC1RS = (unsigned int) ((unew / 100.0) * PR3);
+        }
+
+        break;
+      }
+      // case TRACK: {
+      //
+      //   break;
+      // }
     }
     IFS0bits.T2IF = 0;
 }
@@ -104,12 +138,14 @@ int main()
 
   __builtin_disable_interrupts();
   encoder_init();
-  PWM_init();
+  Current_control_init();
+  Position_control_init();
   __builtin_enable_interrupts();
 
   current_mode = IDLE;
 
-  float kptemp = 0, kitemp = 0;
+  float kptemp = 0, kitemp = 0, kdtemp = 0;
+  float angle = 0;
 
   while(1)
   {
@@ -161,16 +197,45 @@ int main()
         NU32_ReadUART3(buffer,BUF_SIZE);
         sscanf(buffer, "%f", &kitemp);
         __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
-        Kp_current = kptemp;                    // copy local variables to globals used by ISR
+        Kp_current = kptemp;
         Ki_current = kitemp;
+        // set_current_control_gains(kptemp, kitemp); // copy local variables to ones used by ISR
         __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
         break;
       }
       case 'h':                      // get current gains
       {
+        // kptemp = get_current_control_Kp();
+        // kitemp = get_current_control_Ki();
         sprintf(buffer,"%f\r\n", Kp_current); // return Kp_current
         NU32_WriteUART3(buffer);
         sprintf(buffer,"%f\r\n", Ki_current); // return Ki_current
+        NU32_WriteUART3(buffer);
+        break;
+      }
+      case 'i':                      // set position gains
+      {
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%f", &kptemp);
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%f", &kitemp);
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%f", &kdtemp);
+        __builtin_disable_interrupts(); // keep ISR disabled as briefly as possible
+        set_position_control_gains(kptemp, kitemp, kdtemp); // copy local variables to ones used by ISR
+        __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
+        break;
+      }
+      case 'j':                      // get position gains
+      {
+        kptemp = get_position_control_Kp();
+        kitemp = get_position_control_Ki();
+        kdtemp = get_position_control_Kd();
+        sprintf(buffer,"%f\r\n", kptemp); // return Kp_position
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", kitemp); // return Ki_position
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", kdtemp); // return Kd_position
         NU32_WriteUART3(buffer);
         break;
       }
@@ -193,6 +258,18 @@ int main()
         }
         break;
       }
+      case 'l':                      // go to motor angle
+      {
+        __builtin_disable_interrupts();
+        Eint = 0;
+        clear_error_variables();
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%f", &angle);
+        set_desired_angle(angle);
+        current_mode = HOLD;
+        __builtin_enable_interrupts();
+        break;
+      }
       case 'p':
       {
         current_mode = IDLE;
@@ -213,8 +290,8 @@ int main()
       }
       case 'z':
       {
-        // sprintf(buffer,"%d\r\n", Eint_check2);
-        // NU32_WriteUART3(buffer);
+        sprintf(buffer,"%d\r\n", get_reference_current());
+        NU32_WriteUART3(buffer);
         break;
       }
       default:
