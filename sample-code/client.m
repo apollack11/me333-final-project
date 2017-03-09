@@ -34,7 +34,7 @@ has_quit = false;
 while ~has_quit
     fprintf('PIC32 MOTOR DRIVER INTERFACE\n\n');
     % display the menu options; this list will grow
-    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       f: Set PWM (-100 to 100)\n    p: Unpower the Motor                   q: Quit\n    r: Get mode\n');
+    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       f: Set PWM (-100 to 100)\n    g: Set current gains                   h: Get current gains\n    p: Unpower the Motor                   q: Quit\n    r: Get mode\n');
     % read the user's choice
     selection = input('\nENTER COMMAND: ', 's');
      
@@ -61,8 +61,31 @@ while ~has_quit
         case 'f'                         % example operation
             speed = input('Set PWM (-100 to 100) '); % get the speed to send
             fprintf(mySerial, '%d\n',speed); % send the speed
-            speed = fscanf(mySerial,'%d');
-            fprintf('The speed was set to %0.2d\n',speed);
+        case 'g'
+            Kp = input('Set your desired Kp current gain [recommended: 4.76]: ');
+            fprintf(mySerial, '%d\n',Kp);
+            Ki = input('Set your desired Ki current gain [recommended: 0.32]: ');
+            fprintf(mySerial, '%d\n',Ki);
+            fprintf('Sending Kp = %0.2f and Ki = %0.2f to the current controller.\n', Kp, Ki);
+        case 'h'
+            Kp = fscanf(mySerial,'%f');
+            Ki = fscanf(mySerial,'%f');
+            fprintf('The current controller is using Kp = %0.2f and Ki = %0.2f\n', Kp, Ki);
+%         case 'i'
+%             Kp = input('Set your desired Kp position gain [recommended: 4.76]: ');
+%             fprintf(mySerial, '%d\n',Kp);
+%             Ki = input('Set your desired Ki position gain [recommended: 0.32]: ');
+%             fprintf(mySerial, '%d\n',Ki);
+%             Kd = input('Set your desired Kd position gain [recommended: 10.63]: ');
+%             fprintf(mySerial, '%d\n',Ki);
+%             fprintf('Sending Kp = %0.2f, Ki = %0.2f, and Kd = %0.2f to the position controller.\n', Kp, Ki, Kd);
+%         case 'j'
+%             Kp = fscanf(mySerial,'%f');
+%             Ki = fscanf(mySerial,'%f');
+%             Kd = fscanf(mySerial,'%f');
+%             fprintf('The position controller is using Kp = %0.2f, Ki = %0.2f, and Kd = %0.2f\n', Kp, Ki, Kd);
+        case 'k'
+            read_plot_matrix(mySerial);
         case 'p'
             fprintf('Unpowering the motor\n');
         case 'q'
@@ -70,6 +93,22 @@ while ~has_quit
         case 'r'
             state = fscanf(mySerial,'%s');
             fprintf('The PIC32 controller mode is currently %s\n',state);
+        case 'z'
+            U_check = fscanf(mySerial,'%f');
+            U_check
+%             Eint_check2 = fscanf(mySerial,'%d');
+%             Eint_check2
+            Eint_check = fscanf(mySerial,'%d');
+            Eint_check
+            Error_check = fscanf(mySerial,'%f');
+            Error_check
+            Ref_check = fscanf(mySerial,'%d');
+            
+            Ref_check
+            Actual_check = fscanf(mySerial,'%d');
+            Actual_check
+            Unew_check = fscanf(mySerial,'%f');
+            Unew_check
         otherwise
             fprintf('Invalid Selection %c\n', selection);
     end

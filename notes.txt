@@ -19,7 +19,7 @@ ADC Section
 
 Choose R3 to be ~330 ohms
 Motor Resistance: 11.5 ohms
-I_max = 2*V / R_motor = 2 * 6 / 11.5 = 1.043 ohms
+I_max = 2*V / R_motor = 2 * 6 / 11.5 = 1.043 amps
 V_max = I_max * R_sense = 1.043 * 0.015 = 0.0156 V
 1.65 V = G * V_max --> G = 104.77
 R2 = 10 Mohms, R1 = 100,000 ohms
