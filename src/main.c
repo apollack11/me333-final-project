@@ -12,8 +12,6 @@
 static volatile int Speed;
 static volatile float Desired_angle;
 static volatile float Kp_current = 20, Ki_current = 1; // set current control gains to 0
-//static volatile float Kp_current = 0.27, Ki_current = 0.033; // set current control gains to 0
-// static volatile float Kp_position = 150, Ki_position = 0, Kd_position = 5000; // set position control gains to 0
 static volatile float Kp_position = 150, Ki_position = 0, Kd_position = 5000; // set position control gains to 0
 static volatile float Desired_current = 0;
 static volatile int Eint_current = 0;
@@ -21,12 +19,12 @@ static volatile int Eint_position = 0;
 static volatile float Error_prev = 0;
 static volatile int Reference_current_array[ITEST_SIZE];
 static volatile int Actual_current_array[ITEST_SIZE];
+static volatile int TrajectorySize;
+static volatile int TrajectoryIndex = 0;
+static volatile int TrackingTrajectory = 0;
+static volatile float Trajectory[2000]; // 2000 is the maximum number of elements (10s at 200Hz)
+static volatile float MeasuredTrajectory[2000]; // 2000 is the maximum number of elements (10s at 200Hz)
 static volatile int StoringData = 0;    // if this flag = 1, currently storing plot data
-
-static volatile int Eint_check;
-static volatile float Error_prev_check;
-static volatile float Error_check;
-static volatile float U_check;
 
 void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECTOR = 8
     static int current_count = 0;
@@ -121,10 +119,34 @@ void __ISR(_TIMER_2_VECTOR, IPL5SOFT) CurrentController(void) { // _TIMER_2_VECT
 
         break;
       }
-      // case TRACK: {
-      //
-      //   break;
-      // }
+      case TRACK: {
+        // measure the current value
+        actual_current = ADC_milliAmps();
+        reference_current = Desired_current;
+
+        // PI Controller
+        float error = reference_current - actual_current;
+        Eint_current = Eint_current + error;
+        float u = Kp_current * error + Ki_current * Eint_current;
+
+        float unew = ((u / 1000) / 3.3) * 100;
+        if (unew > 100.0) {
+          unew = 100.0;
+        } else if (unew < -100.0) {
+          unew = -100.0;
+        }
+
+        // set new PWM value
+        if (unew < 0) {
+          LATDbits.LATD5 = 1;
+          OC1RS = (unsigned int) ((-unew / 100.0) * PR3);
+        } else {
+          LATDbits.LATD5 = 0;
+          OC1RS = (unsigned int) ((unew / 100.0) * PR3);
+        }
+
+        break;
+      }
     }
     IFS0bits.T2IF = 0;
 }
@@ -155,14 +177,6 @@ void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) {
         Eint_position = Eint_position + error;
         float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
 
-        // // if (flag == 0) {
-        //   Eint_check = Eint_position;
-        //   Error_prev_check = Error_prev;
-        //   Error_check = Desired_angle - actual_position;
-        //   U_check = -(Kp_position * (Desired_angle - actual_position));
-        //   // flag = 1;
-        // // }
-
         // not sure what to put here
         if (u > 300) {
           Desired_current = 300;
@@ -175,10 +189,37 @@ void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) {
         Error_prev = error;
         break;
       }
-      // case TRACK: {
-      //
-      //   break;
-      // }
+      case TRACK: {
+        // measure the angle value (deg)
+        actual_position = encoder_angle();
+
+        MeasuredTrajectory[TrajectoryIndex] = actual_position;
+
+        // PI Controller
+        float error = Trajectory[TrajectoryIndex] - actual_position;
+        float edot = error - Error_prev;
+        Eint_position = Eint_position + error;
+        float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
+
+        // not sure what to put here
+        if (u > 300) {
+          Desired_current = 300;
+        } else if (u < -300) {
+          Desired_current = -300;
+        } else {
+          Desired_current = u;
+        }
+
+        Error_prev = error;
+
+        TrajectoryIndex++;
+        if (TrajectoryIndex == TrajectorySize) {
+          Desired_angle = Trajectory[TrajectoryIndex-1];
+          TrajectoryIndex = 0;
+          TrackingTrajectory = 0;
+        }
+        break;
+      }
     }
     IFS0bits.T4IF = 0;
 }
@@ -304,12 +345,12 @@ int main()
         sprintf(buffer,"%d\r\n", ITEST_SIZE); // send number of values in the arrays
         NU32_WriteUART3(buffer);
         int i;
+        __builtin_disable_interrupts();
         for (i = 0; i < ITEST_SIZE; i++) {
-          __builtin_disable_interrupts();
           sprintf(buffer,"%d %d\r\n", Reference_current_array[i], Actual_current_array[i]); // return Ki_current
           NU32_WriteUART3(buffer);
-          __builtin_enable_interrupts();
         }
+        __builtin_enable_interrupts();
         break;
       }
       case 'l':                      // go to motor angle
@@ -324,6 +365,66 @@ int main()
         Desired_angle = angle;
         __builtin_enable_interrupts();  // only 2 simple C commands while ISRs disabled
         set_mode(HOLD);
+        break;
+      }
+      case 'm':
+      {
+        set_mode(IDLE);
+        int size;
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%d", &size);
+        __builtin_disable_interrupts();
+        TrajectorySize = size;
+        int i;
+        float temp;
+        for (i = 0; i < TrajectorySize; i++) {
+          NU32_ReadUART3(buffer,BUF_SIZE);
+          sscanf(buffer, "%f", &temp);
+          Trajectory[i] = temp;
+        }
+        __builtin_enable_interrupts();
+        break;
+      }
+      case 'n':
+      {
+        set_mode(IDLE);
+        int size;
+        NU32_ReadUART3(buffer,BUF_SIZE);
+        sscanf(buffer, "%d", &size);
+        __builtin_disable_interrupts();
+        TrajectorySize = size;
+        int i;
+        float temp;
+        for (i = 0; i < TrajectorySize; i++) {
+          NU32_ReadUART3(buffer,BUF_SIZE);
+          sscanf(buffer, "%f", &temp);
+          Trajectory[i] = temp;
+        }
+        __builtin_enable_interrupts();
+        break;
+      }
+      case 'o':
+      {
+        Eint_current = 0;
+        Eint_position = 0;
+        Error_prev = 0;
+        Desired_current = 0;
+        TrackingTrajectory = 1;
+        set_mode(TRACK);
+        while (TrackingTrajectory) {
+          ;
+        }
+        set_mode(HOLD);
+        __builtin_disable_interrupts();
+        sprintf(buffer,"%d\r\n", TrajectorySize);
+        NU32_WriteUART3(buffer);
+        int i;
+        __builtin_disable_interrupts();
+        for (i = 0; i < TrajectorySize; i++) {
+          sprintf(buffer,"%f %f\r\n", Trajectory[i], MeasuredTrajectory[i]);
+          NU32_WriteUART3(buffer);
+        }
+        __builtin_enable_interrupts();
         break;
       }
       case 'p':
@@ -346,20 +447,24 @@ int main()
       }
       case 'z':
       {
-        sprintf(buffer,"%f\r\n", Desired_current);
+        sprintf(buffer,"%d\r\n", TrajectorySize);
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%d\r\n", Eint_check);
+        sprintf(buffer,"%d\r\n", TrajectoryIndex);
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%d\r\n", Eint_position);
+        sprintf(buffer,"%f\r\n", Trajectory[200]);
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", Error_prev_check);
+        sprintf(buffer,"%f\r\n", MeasuredTrajectory[200]);
         NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", Error_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", U_check);
-        NU32_WriteUART3(buffer);
-        sprintf(buffer,"%f\r\n", Desired_angle);
-        NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%d\r\n", Eint_position);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Error_prev_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Error_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", U_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Desired_angle);
+        // NU32_WriteUART3(buffer);
         break;
       }
       default:

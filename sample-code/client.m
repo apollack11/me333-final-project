@@ -90,6 +90,32 @@ while ~has_quit
             angle = input('Enter the desired motor angle in degrees: ');
             fprintf(mySerial, '%f\n', angle);
             fprintf('Motor moving to %0.0f degrees\n', angle);
+        case 'm'
+            traj = input('Enter step trajectory, in sec and degrees [time1, ang1; time2, ang2; ...]: ');
+            while (traj(end,1) > 10)
+                fprintf('Error: Maximum trajectory time is 10 seconds.');
+                traj = input('Enter step trajectory, in sec and degrees [time1, ang1; time2, ang2; ...]: ');
+            end
+            ref = genRef(traj,'step');
+            size(ref,2)
+            fprintf(mySerial, '%d\n', size(ref,2));
+            for i = 1:size(ref,2)
+               fprintf(mySerial, '%f\n', ref(i)); 
+            end
+        case 'n'
+            traj = input('Enter cubic trajectory, in sec and degrees [time1, ang1; time2, ang2; ...]: ');
+            while (traj(end,1) > 10)
+                fprintf('Error: Maximum trajectory time is 10 seconds.');
+                traj = input('Enter cubic trajectory, in sec and degrees [time1, ang1; time2, ang2; ...]: ');
+            end
+            ref = genRef(traj,'cubic');
+            fprintf(mySerial, '%d\n', size(ref,2));
+            for i = 1:size(ref,2)
+               fprintf(mySerial, '%f\n', ref(i)); 
+            end
+        case 'o'
+            fprintf('Tracking stored trajectory');
+            plot_trajectories(mySerial);
         case 'p'
             fprintf('Unpowering the motor\n');
         case 'q'
@@ -98,20 +124,20 @@ while ~has_quit
             state = fscanf(mySerial,'%s');
             fprintf('The PIC32 controller mode is currently %s\n',state);
         case 'z'
-            ref_current = fscanf(mySerial,'%f');
-            ref_current
-            Eint_check = fscanf(mySerial,'%d');
-            Eint_check
-            Eint_position = fscanf(mySerial,'%d');
-            Eint_position
-            Eprev_check = fscanf(mySerial,'%f');
-            Eprev_check
-            Error_check = fscanf(mySerial,'%f');
-            Error_check
-            U_check = fscanf(mySerial,'%f');
-            U_check
-            Desired_angle = fscanf(mySerial,'%f');
-            Desired_angle
+            TrajSize = fscanf(mySerial,'%d');
+            TrajSize
+            TrajIndex = fscanf(mySerial,'%d');
+            TrajIndex
+            Traj200 = fscanf(mySerial,'%f');
+            Traj200
+            MeasTraj200 = fscanf(mySerial,'%f');
+            MeasTraj200
+%             Error_check = fscanf(mySerial,'%f');
+%             Error_check
+%             U_check = fscanf(mySerial,'%f');
+%             U_check
+%             Desired_angle = fscanf(mySerial,'%f');
+%             Desired_angle
         otherwise
             fprintf('Invalid Selection %c\n', selection);
     end
