@@ -9,6 +9,8 @@ typedef enum {
   TRACK
 } Mode;
 
+// Mode current_mode;
+
 int get_mode();
 
 char * get_string_mode();

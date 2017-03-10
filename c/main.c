@@ -177,6 +177,7 @@ void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) {
         Eint_position = Eint_position + error;
         float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
 
+        // not sure what to put here
         if (u > 300) {
           Desired_current = 300;
         } else if (u < -300) {
@@ -200,6 +201,7 @@ void __ISR(_TIMER_4_VECTOR, IPL5SOFT) PositionController(void) {
         Eint_position = Eint_position + error;
         float u = -(Kp_position * error + Ki_position * Eint_position + Kd_position * edot);
 
+        // not sure what to put here
         if (u > 300) {
           Desired_current = 300;
         } else if (u < -300) {
@@ -441,6 +443,28 @@ int main()
       {
         sprintf(buffer,"%s\r\n", get_string_mode());
         NU32_WriteUART3(buffer);
+        break;
+      }
+      case 'z':
+      {
+        sprintf(buffer,"%d\r\n", TrajectorySize);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%d\r\n", TrajectoryIndex);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", Trajectory[200]);
+        NU32_WriteUART3(buffer);
+        sprintf(buffer,"%f\r\n", MeasuredTrajectory[200]);
+        NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%d\r\n", Eint_position);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Error_prev_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Error_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", U_check);
+        // NU32_WriteUART3(buffer);
+        // sprintf(buffer,"%f\r\n", Desired_angle);
+        // NU32_WriteUART3(buffer);
         break;
       }
       default:

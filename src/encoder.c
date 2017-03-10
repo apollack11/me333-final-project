@@ -42,5 +42,3 @@ void encoder_init(void) {
   SPI4CONbits.SMP = 1;      // sample at the end of the clock
   SPI4CONbits.ON = 1;       // turn SPI on
 }
-
-// you write functions to reset encoder and return angle in 1/10th degrees

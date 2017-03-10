@@ -12,7 +12,7 @@ function client(port)
 %       client('COM3') (PC)
 %
 %   For convenience, you may want to change this so that the port is hardcoded.
-   
+
 % Opening COM connection
 if ~isempty(instrfind)
     fclose(instrfind);
@@ -23,24 +23,24 @@ fprintf('Opening port %s....\n',port);
 
 % settings for opening the serial port. baud rate 230400, hardware flow control
 % wait up to 120 seconds for data before timing out
-mySerial = serial(port, 'BaudRate', 230400, 'FlowControl', 'hardware','Timeout',10); 
+mySerial = serial(port, 'BaudRate', 230400, 'FlowControl', 'hardware','Timeout',10);
 % opens serial connection
 fopen(mySerial);
 % closes serial port when function exits
-clean = onCleanup(@()fclose(mySerial));                                 
+clean = onCleanup(@()fclose(mySerial));
 
 has_quit = false;
 % menu loop
 while ~has_quit
     fprintf('PIC32 MOTOR DRIVER INTERFACE\n\n');
     % display the menu options; this list will grow
-    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       f: Set PWM (-100 to 100)\n    g: Set current gains                   h: Get current gains\n    i: Set position gains                  j: Get position gains\n    k: Test current control                l: Go to angle (deg)\n    p: Unpower the Motor                   q: Quit\n    r: Get mode\n');
+    fprintf('    a: Read Current Sensor (ADC Counts)    b: Read Current Sensor (mA)\n    c: Read Encoder (Ticks)                d: Read Encoder (Degrees)\n    e: Reset Encoder                       f: Set PWM (-100 to 100)\n    g: Set current gains                   h: Get current gains\n    i: Set position gains                  j: Get position gains\n    k: Test current control                l: Go to angle (deg)\n    m: Send step trajectory                n: Send cubic trajectory\n    o: Execute trajectory                  p: Unpower the Motor\n    q: Quit                                r: Get mode\n');
     % read the user's choice
     selection = input('\nENTER COMMAND: ', 's');
-     
+
     % send the command to the PIC32
     fprintf(mySerial,'%c\n',selection);
-    
+
     % take the appropriate action
     switch selection
         case 'a'
@@ -100,7 +100,7 @@ while ~has_quit
             size(ref,2)
             fprintf(mySerial, '%d\n', size(ref,2));
             for i = 1:size(ref,2)
-               fprintf(mySerial, '%f\n', ref(i)); 
+               fprintf(mySerial, '%f\n', ref(i));
             end
         case 'n'
             traj = input('Enter cubic trajectory, in sec and degrees [time1, ang1; time2, ang2; ...]: ');
@@ -111,7 +111,7 @@ while ~has_quit
             ref = genRef(traj,'cubic');
             fprintf(mySerial, '%d\n', size(ref,2));
             for i = 1:size(ref,2)
-               fprintf(mySerial, '%f\n', ref(i)); 
+               fprintf(mySerial, '%f\n', ref(i));
             end
         case 'o'
             fprintf('Tracking stored trajectory');
@@ -123,21 +123,6 @@ while ~has_quit
         case 'r'
             state = fscanf(mySerial,'%s');
             fprintf('The PIC32 controller mode is currently %s\n',state);
-        case 'z'
-            TrajSize = fscanf(mySerial,'%d');
-            TrajSize
-            TrajIndex = fscanf(mySerial,'%d');
-            TrajIndex
-            Traj200 = fscanf(mySerial,'%f');
-            Traj200
-            MeasTraj200 = fscanf(mySerial,'%f');
-            MeasTraj200
-%             Error_check = fscanf(mySerial,'%f');
-%             Error_check
-%             U_check = fscanf(mySerial,'%f');
-%             U_check
-%             Desired_angle = fscanf(mySerial,'%f');
-%             Desired_angle
         otherwise
             fprintf('Invalid Selection %c\n', selection);
     end
